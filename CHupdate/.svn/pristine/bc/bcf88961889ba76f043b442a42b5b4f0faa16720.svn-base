@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AbsoluteLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="1000dp"
+    android:layout_height="600dp"
+    android:orientation="vertical" >
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_x="26dp"
+        android:layout_y="26dp"
+        android:text="@string/curr_ver_message"
+        android:textSize="30sp" />
+
+    <LinearLayout
+        android:layout_width="980dp"
+        android:layout_height="50dp"
+        android:layout_x="10dp"
+        android:layout_y="70dp"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp" >
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1"
+            android:layout_x="27dp"
+            android:layout_y="107dp"
+            android:gravity="center_vertical"
+            android:text="@string/cur_ver"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/main_curver"
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1"
+            android:layout_x="915dp"
+            android:layout_y="106dp"
+            android:gravity="center_vertical|right"
+            android:text="V1.0"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="980dp"
+        android:layout_height="60dp"
+        android:layout_x="10dp"
+        android:layout_y="450dp"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp" >
+
+        <Button
+            android:id="@+id/main_check"
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1"
+            android:layout_x="27dp"
+            android:layout_y="107dp"
+            android:gravity="center"
+            android:text="@string/check_update"
+            android:textSize="30sp" />
+
+        <Button
+            android:id="@+id/main_download"
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1"
+            android:layout_x="915dp"
+            android:layout_y="106dp"
+            android:gravity="center"
+            android:text="@string/download"
+            android:textSize="30sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="980dp"
+        android:layout_height="120dp"
+        android:layout_x="10dp"
+        android:layout_y="300dp"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp" >
+
+        <TextView
+            android:id="@+id/tv_checkmsg"
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1"
+            android:layout_x="27dp"
+            android:layout_y="107dp"
+            android:gravity="center"
+            android:textSize="20sp" />
+    </LinearLayout>
+
+</AbsoluteLayout>

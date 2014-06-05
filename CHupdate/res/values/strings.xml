@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">system update</string>
+    <string name="action_settings">system update</string>
+    <string name="check_update">Upgrade detection</string>
+    <string name="curr_ver_message">The current system information</string>
+    <string name="download">Download</string>
+    <string name="title_network">Network Upgrade</string>
+    <string name="title_local">Local Upgrade</string>
+    <string name="title_download">Download Progress</string>
+    <string name="download_statue">File download status</string>
+    <string name="download_msg">No file downloads</string>
+    <string name="download_update">Update Now</string>
+    <string name="download_update_later">Later updates</string>
+    <string name="main_checking">Being examined ...</string>
+    <string name="main_have_new">There are new software updates are downloaded?</string>
+    <string name="main_check">Upgrade detection</string>
+    <string name="server_have_no">No update information</string>
+    <string name="server_network_error">Network connection error!</string>
+    <string name="update_now">Software download is complete, whether the update?</string>
+    <string name="downloading">Software download, please do not power on or off the network operation!</string>
+    <string name="download_error">Software Download Error!</string>
+    <string name="updateing">Updating ...</string>
+    <string name="update_error">Update Error!</string>
+    <string name="server_error">Access Update Service error</string>
+    <string name="cur_ver">The current software version:</string>
+    <string name="android_version">Android Version: </string>
+    <string name="kernel_version">Kernel version:</string>
+    <string name="software_name">Software version:</string>
+    <string name="clear_message">Whether to clear the data?</string>
+    <string name="clear_yes">Yes</string>
+    <string name="clear_no">No</string>
+
+</resources>

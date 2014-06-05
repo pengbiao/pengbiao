@@ -1,0 +1,971 @@
+package com.siviton.huan.server;
+
+import java.io.File;
+import java.io.IOException;
+
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Message;
+import android.os.RecoverySystem;
+import android.os.SystemClock;
+import android.provider.Settings;
+import android.view.View;
+
+import com.mstar.android.tv.TvFactoryManager;
+import com.mstar.android.tvapi.factory.vo.EnumAcOnPowerOnMode;
+import com.siviton.huanapi.R;
+import com.siviton.huanapi.data.DataSave;
+import com.siviton.huanapi.data.HuanApi;
+import com.siviton.huanapi.data.HuanLoginListen;
+import com.siviton.huanapi.data.UpgradeIncrResponse;
+import com.siviton.huanapi.data.UpgradeIncrResponseUpgrade;
+
+public class HuanServer extends Service {
+
+	public static final int BOOT = 1;
+	public static final int NET_CHANGE = 2;
+	public static final int MAIN_TEST = 3;
+	public static final int CHECK_UPDATE = 4;
+	public static final int DOWNLOAD = 5;
+	public static final int DOWNLOAD_COM = 6;
+	public static final int UPDATE_NOW = 7;
+	public static final int UPDATE_LATER = 8;
+	public static final int UPDATE_LATER_NOTIFY = 9;
+	private HuanApi mHuanApi;
+	private boolean isfirst = true;
+	private boolean isCheck;
+	private boolean isDownloadStart;
+	private boolean isUpdate;
+	private UpgradeIncrResponse mUpgradeIncrResponse;
+	private UpgradeIncrResponseUpgrade mUpgradeIncrResponseUpgrade;
+	private UpgradeIncrResponseUpgrade upgradeIncrResponseUpgrade = null;
+	public static final int UPDATE_DOWNLOADING = 1;
+	public static final int UPDATE_DOWNLOAD_SUCC = 2;
+	public static final int UPDATE_DOWNLOAD_FAIL = 3;
+	public static final int UPDATE_UPDATE_LATER = 4;
+	public static final int UPDATE_UPDATE_SUCC = 5;
+	public static final int UPDATE_UPDATE_START = 6;
+	public static final int UPDATE_UPDATE_FAIL = 7;
+	public static final int UPDATE_NULL = -1;
+	private static final int HANDLER_CHECK = 1;
+	private static final int HANDLER_CHECK_START = 11;
+	private static final int HANDLER_CHECK_SUCC = 12;
+	private static final int HANDLER_CHECK_FAIL_NETISNO200 = 13;
+	private static final int HANDLER_CHECK_FAIL_NETEXCEPTION = 14;
+
+	private static final int HANDLER_DOWMLOAD = 2;
+	private static final int HANDLER_DOWMLOAD_START = 21;
+	private static final int HANDLER_DOWMLOAD_SUCC = 22;
+	private static final int HANDLER_DOWMLOAD_COM = 25;
+	private static final int HANDLER_DOWMLOAD_FAIL_NETISNO200 = 23;
+	private static final int HANDLER_DOWMLOAD_FAIL_NETEXCEPTION = 24;
+	private static final int HANDLER_UPDATE = 3;
+	private static final int HANDLER_UPDATE_START = 31;
+	private static final int HANDLER_UPDATE_SUCC = 32;
+	private static final int HANDLER_UPDATE_FAIL = 33;
+	private static final int HANDLER_UPDATE_LATER = 34;
+	private static final int HANDLER_UPDATE_LATER_NOTIFY = 35;
+	private DataSave mDataSave;
+	private AlarmManager mAlarmManager;
+	private PendingIntent mScheduledCheckIntent;
+
+	@Override
+	public IBinder onBind(Intent arg0) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void onCreate() {
+		// TODO Auto-generated method stub
+		mHuanApi = new HuanApi(getApplicationContext(), mHuanLoginListen);
+		mDataSave = new DataSave(getApplicationContext());
+		mAlarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
+		super.onCreate();
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		// TODO Auto-generated method stub
+		Message message;
+		if (intent != null && intent.getExtras() != null) {
+			int style = -1;
+			style = intent.getExtras().getInt("style");
+			switch (style) {
+			case BOOT:
+				int i = mDataSave.getUpdateState();
+				switch (i) {
+				case UPDATE_UPDATE_START:
+				case UPDATE_UPDATE_LATER:
+				case UPDATE_DOWNLOAD_SUCC:
+					File updatefile = new File(HuanApi.FILE_PATH);
+					if (!updatefile.exists()) {
+						mDataSave.setUpdateState(UPDATE_NULL);
+					} else {
+						message = mHandler.obtainMessage();
+						message.what = HANDLER_DOWMLOAD;
+						message.arg1 = HANDLER_DOWMLOAD_COM;
+						mHandler.sendMessage(message);
+					}
+					break;
+				case UPDATE_UPDATE_SUCC:
+//					File updatefile2 = new File(HuanApi.FILE_PATH);
+//					if (!updatefile2.exists()) {
+//						mDataSave.setUpdateState(UPDATE_NULL);
+//					}
+					break;
+				default:
+					break;
+				}
+
+				break;
+			case MAIN_TEST:
+			case NET_CHANGE:
+				if (isfirst) {
+					ConnectivityManager manager = (ConnectivityManager) this
+							.getSystemService(Context.CONNECTIVITY_SERVICE);
+					if (manager == null) {
+						if (MainActivity.mMainActivity != null
+								&& MainActivity.mMainActivity.mTextView != null) {
+							MainActivity.mMainActivity.mTextView
+									.setText("无法连接网络!!!");
+						}
+					} else {
+						NetworkInfo networkinfo = manager
+								.getActiveNetworkInfo();
+						if (networkinfo == null || !networkinfo.isAvailable()) {
+							if (MainActivity.mMainActivity != null
+									&& MainActivity.mMainActivity.mTextView != null) {
+								MainActivity.mMainActivity.mTextView
+										.setText("无法连接网络!!!");
+							}
+						} else {
+							mHuanApi.DeviceActive();
+							isfirst = false;
+						}
+
+					}
+
+				} else {
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mTextView != null) {
+						MainActivity.mMainActivity.mTextView
+								.setText("已经登录完成!!!");
+					}
+				}
+				break;
+			case CHECK_UPDATE:
+				message = mHandler.obtainMessage();
+				message.what = HANDLER_CHECK;
+				message.arg1 = HANDLER_CHECK_START;
+				mHandler.sendMessage(message);
+				break;
+			case DOWNLOAD:
+				message = mHandler.obtainMessage();
+				message.what = HANDLER_DOWMLOAD;
+				message.arg1 = HANDLER_DOWMLOAD_START;
+				mHandler.sendMessage(message);
+				break;
+
+			case DOWNLOAD_COM:
+				message = mHandler.obtainMessage();
+				message.what = HANDLER_DOWMLOAD;
+				message.arg1 = HANDLER_DOWMLOAD_COM;
+				mHandler.sendMessage(message);
+				break;
+
+			case UPDATE_NOW:
+				message = mHandler.obtainMessage();
+				message.what = HANDLER_UPDATE;
+				message.arg1 = HANDLER_UPDATE_START;
+				mHandler.sendMessage(message);
+			case UPDATE_LATER:
+				message = mHandler.obtainMessage();
+				message.what = HANDLER_UPDATE;
+				message.arg1 = HANDLER_UPDATE_LATER;
+				mHandler.sendMessage(message);
+				break;
+
+			case UPDATE_LATER_NOTIFY:
+				message = mHandler.obtainMessage();
+				message.what = HANDLER_UPDATE;
+				message.arg1 = HANDLER_UPDATE_LATER_NOTIFY;
+				mHandler.sendMessage(message);
+				break;
+			default:
+				break;
+			}
+		}
+
+		return START_STICKY;
+	}
+
+	private Handler mHandler = new Handler() {
+		public void handleMessage(android.os.Message msg) {
+			switch (msg.what) {
+			case HANDLER_CHECK:
+				switch (msg.arg1) {
+				case HANDLER_CHECK_START:
+					if (isCheck) {
+					} else {
+						isCheck = true;
+						mUpgradeIncrResponse = null;
+						mUpgradeIncrResponseUpgrade = null;
+						mHuanApi.getUpdateinfo();
+					}
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg
+								.setText(getResources().getString(
+										R.string.main_checking));
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(false);
+						// MainActivity.mMainActivity.mViewPager.setCurrentItem(0);
+						MainActivity.mMainActivity.mDownloadMsg.setText("");
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					break;
+				case HANDLER_CHECK_SUCC:
+
+					// pengb 检测成功
+					if (mUpgradeIncrResponse != null) {
+						mUpgradeIncrResponseUpgrade = mUpgradeIncrResponse
+								.getUpgradeIncrResponseUpgrade(0);
+					}
+
+					if (mUpgradeIncrResponseUpgrade != null) {
+						if (mUpgradeIncrResponseUpgrade.getFileurl() != null) {
+							// pengb can download
+							if (MainActivity.mMainActivity != null
+									&& MainActivity.mMainActivity.mCheckMsg != null) {
+								MainActivity.mMainActivity.mCheckMsg
+										.setText(getResources().getString(
+												R.string.main_have_new));
+								MainActivity.mMainActivity.mdownload
+										.setEnabled(true);
+								MainActivity.mMainActivity.mcheckupdate
+										.setEnabled(false);
+								MainActivity.mMainActivity.mViewPager
+										.setCurrentItem(0);
+								MainActivity.mMainActivity.mDownloadMsg
+										.setText("");
+								MainActivity.mMainActivity.mUpdate
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mUpdatelater
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mdoanLoadPro
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mdowanloadSize
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mProgressBar
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mUpdate
+										.setEnabled(false);
+								MainActivity.mMainActivity.mUpdatelater
+										.setEnabled(false);
+							} else {
+								startActivity(new Intent(
+										getApplicationContext(),
+										MainActivity.class).putExtra(
+										"haveupdate", 1).addFlags(
+										Intent.FLAG_ACTIVITY_NEW_TASK));
+							}
+						} else {
+							if (MainActivity.mMainActivity != null
+									&& MainActivity.mMainActivity.mCheckMsg != null) {
+								MainActivity.mMainActivity.mCheckMsg
+										.setText(getResources().getString(
+												R.string.server_have_no));
+								MainActivity.mMainActivity.mdownload
+										.setEnabled(false);
+								MainActivity.mMainActivity.mcheckupdate
+										.setEnabled(true);
+								MainActivity.mMainActivity.mViewPager
+										.setCurrentItem(0);
+								MainActivity.mMainActivity.mDownloadMsg
+										.setText("");
+								MainActivity.mMainActivity.mUpdate
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mUpdatelater
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mdoanLoadPro
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mdowanloadSize
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mProgressBar
+										.setVisibility(View.GONE);
+								MainActivity.mMainActivity.mUpdate
+										.setEnabled(false);
+								MainActivity.mMainActivity.mUpdatelater
+										.setEnabled(false);
+							}
+						}
+					} else {
+						if (MainActivity.mMainActivity != null
+								&& MainActivity.mMainActivity.mCheckMsg != null) {
+							MainActivity.mMainActivity.mCheckMsg
+									.setText(getResources().getString(
+											R.string.server_have_no));
+							MainActivity.mMainActivity.mdownload
+									.setEnabled(false);
+							MainActivity.mMainActivity.mcheckupdate
+									.setEnabled(true);
+							MainActivity.mMainActivity.mViewPager
+									.setCurrentItem(0);
+							MainActivity.mMainActivity.mDownloadMsg.setText("");
+							MainActivity.mMainActivity.mUpdate
+									.setVisibility(View.GONE);
+							MainActivity.mMainActivity.mUpdatelater
+									.setVisibility(View.GONE);
+							MainActivity.mMainActivity.mdoanLoadPro
+									.setVisibility(View.GONE);
+							MainActivity.mMainActivity.mdowanloadSize
+									.setVisibility(View.GONE);
+							MainActivity.mMainActivity.mProgressBar
+									.setVisibility(View.GONE);
+							MainActivity.mMainActivity.mUpdate
+									.setEnabled(false);
+							MainActivity.mMainActivity.mUpdatelater
+									.setEnabled(false);
+						}
+					}
+					isCheck = false;
+					break;
+				case HANDLER_CHECK_FAIL_NETISNO200:
+					// pengb 检测失败
+					isCheck = false;
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg
+								.setText(getResources().getString(
+										R.string.server_error));
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(true);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(0);
+						MainActivity.mMainActivity.mDownloadMsg.setText("");
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					break;
+				case HANDLER_CHECK_FAIL_NETEXCEPTION:
+					// pengb 检测失败
+					isCheck = false;
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg
+								.setText(getResources().getString(
+										R.string.server_error));
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(true);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(0);
+						MainActivity.mMainActivity.mDownloadMsg.setText("");
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					break;
+				default:
+					break;
+				}
+
+				break;
+
+			case HANDLER_DOWMLOAD:
+				System.out.println("======pengb data==2=====");
+				switch (msg.arg1) {
+				case HANDLER_DOWMLOAD_START:
+					if (isDownloadStart) {
+						// pengb isdownloadstart
+					} else {
+						isDownloadStart = true;
+						mHuanApi.downloadUpdateFile(mUpgradeIncrResponseUpgrade
+								.getFileurl());
+					}
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg.setText("");
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(false);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(1);
+						MainActivity.mMainActivity.mDownloadMsg
+								.setText(getResources().getString(
+										R.string.downloading));
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					break;
+				case HANDLER_DOWMLOAD_SUCC:
+					// pengb 检测成功
+					mDataSave.setAppendver(mUpgradeIncrResponseUpgrade
+							.getAppendver());
+					mDataSave.setAppid(mUpgradeIncrResponseUpgrade.getAppid());
+					mDataSave.setApptype(mUpgradeIncrResponseUpgrade
+							.getApptype());
+					mDataSave.setDescription(mUpgradeIncrResponseUpgrade
+							.getDescription());
+					mDataSave.setDownloadID(mUpgradeIncrResponseUpgrade
+							.getDownloadid());
+					mDataSave.setFileurl(mUpgradeIncrResponseUpgrade
+							.getFileurl());
+					mDataSave.setIncrement(mUpgradeIncrResponseUpgrade
+							.getIncrement());
+					mDataSave.setMd5(mUpgradeIncrResponseUpgrade.getMd5());
+					mDataSave.setMidicon(mUpgradeIncrResponseUpgrade
+							.getMidicon());
+					mDataSave.setMinicon(mUpgradeIncrResponseUpgrade
+							.getMinicon());
+					mDataSave.setNote(mUpgradeIncrResponseUpgrade.getNote());
+					mDataSave.setSize(mUpgradeIncrResponseUpgrade.getSize());
+					mDataSave.setTitle(mUpgradeIncrResponseUpgrade.getTitle());
+					mDataSave.setType(mUpgradeIncrResponseUpgrade.getType());
+					mDataSave.setUpdateState(UPDATE_DOWNLOADING);
+					mDataSave.setVerid(mUpgradeIncrResponseUpgrade.getVerid());
+					mDataSave.setVersion(mUpgradeIncrResponseUpgrade
+							.getVersion());
+					isDownloadStart = false;
+
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg.setText("");
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(false);
+						// MainActivity.mMainActivity.mViewPager.setCurrentItem(1);
+						MainActivity.mMainActivity.mDownloadMsg
+								.setText(getResources().getString(
+										R.string.downloading));
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					break;
+				case HANDLER_DOWMLOAD_FAIL_NETEXCEPTION:
+					// pengb 检测失败
+					mDataSave.setUpdateState(UPDATE_DOWNLOAD_FAIL);
+					isDownloadStart = false;
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg.setText("");
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(true);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(1);
+						MainActivity.mMainActivity.mDownloadMsg
+								.setText(getResources().getString(
+										R.string.server_error));
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					break;
+				case HANDLER_DOWMLOAD_FAIL_NETISNO200:
+					// pengb 检测失败
+					mDataSave.setUpdateState(UPDATE_DOWNLOAD_FAIL);
+					isDownloadStart = false;
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg.setText("");
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(true);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(1);
+						MainActivity.mMainActivity.mDownloadMsg
+								.setText(getResources().getString(
+										R.string.server_error));
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					break;
+
+				case HANDLER_DOWMLOAD_COM:
+					// pengb 检测失败
+					mDataSave.setUpdateState(UPDATE_DOWNLOAD_SUCC);
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg.setText("");
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(false);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(1);
+						MainActivity.mMainActivity.mDownloadMsg
+								.setText(getResources().getString(
+										R.string.update_now));
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(true);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(true);
+					} else {
+						startActivity(new Intent(getApplicationContext(),
+								MainActivity.class)
+								.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+					}
+					break;
+				default:
+					break;
+				}
+
+				break;
+
+			case HANDLER_UPDATE:
+				System.out.println("======pengb data====3===");
+				switch (msg.arg1) {
+				case HANDLER_UPDATE_START:
+					if (isUpdate) {
+						// pengb 正在检测更新
+					} else {
+						isUpdate = true;
+						mDataSave.setUpdateState(UPDATE_UPDATE_START);
+						TvFactoryManager.getInstance().setPowerOnMode(
+								EnumAcOnPowerOnMode.E_ACON_POWERON_DIRECT);
+						Settings.System.putString(getContentResolver(),
+								"poweron_mode", "dt");
+						try {
+							Thread.sleep(100);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						new InstallAndRebootThread(getApplicationContext(),
+								new File(HuanApi.FILE_PATH)).start();
+					}
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg.setText("");
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(false);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(1);
+						MainActivity.mMainActivity.mDownloadMsg
+								.setText(getResources().getString(
+										R.string.updateing));
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					break;
+				case HANDLER_UPDATE_LATER:
+					// pengb 检测成功
+					if (isUpdate) {
+						if (MainActivity.mMainActivity != null
+								&& MainActivity.mMainActivity.mCheckMsg != null) {
+							MainActivity.mMainActivity.mCheckMsg.setText("");
+							MainActivity.mMainActivity.mdownload
+									.setEnabled(false);
+							MainActivity.mMainActivity.mcheckupdate
+									.setEnabled(false);
+							MainActivity.mMainActivity.mViewPager
+									.setCurrentItem(1);
+							MainActivity.mMainActivity.mDownloadMsg
+									.setText(getResources().getString(
+											R.string.updateing));
+							MainActivity.mMainActivity.mUpdate
+									.setVisibility(View.VISIBLE);
+							MainActivity.mMainActivity.mUpdatelater
+									.setVisibility(View.VISIBLE);
+							MainActivity.mMainActivity.mdoanLoadPro
+									.setVisibility(View.GONE);
+							MainActivity.mMainActivity.mdowanloadSize
+									.setVisibility(View.GONE);
+							MainActivity.mMainActivity.mProgressBar
+									.setVisibility(View.GONE);
+							MainActivity.mMainActivity.mUpdate
+									.setEnabled(false);
+							MainActivity.mMainActivity.mUpdatelater
+									.setEnabled(false);
+						}
+					} else {
+						mDataSave.setUpdateState(UPDATE_UPDATE_LATER);
+						setScheduledCheck(false);
+						setScheduledCheck(true);
+						if (MainActivity.mMainActivity != null) {
+
+							MainActivity.mMainActivity.finish();
+
+						}
+					}
+					break;
+				case HANDLER_UPDATE_FAIL:
+					isUpdate = false;
+					mDataSave.setUpdateState(UPDATE_UPDATE_FAIL);
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg
+								.setText(getResources().getString(
+										R.string.update_error));
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(true);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(0);
+						MainActivity.mMainActivity.mDownloadMsg.setText("");
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(false);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(false);
+					}
+					// pengb 检测成功
+					break;
+				case HANDLER_UPDATE_SUCC:
+					isUpdate = false;
+					mDataSave.setUpdateState(UPDATE_UPDATE_SUCC);
+					break;
+				case HANDLER_UPDATE_LATER_NOTIFY:
+					if (MainActivity.mMainActivity != null
+							&& MainActivity.mMainActivity.mCheckMsg != null) {
+						MainActivity.mMainActivity.mCheckMsg.setText("");
+						MainActivity.mMainActivity.mdownload.setEnabled(false);
+						MainActivity.mMainActivity.mcheckupdate
+								.setEnabled(false);
+						MainActivity.mMainActivity.mViewPager.setCurrentItem(1);
+						MainActivity.mMainActivity.mDownloadMsg
+								.setText(getResources().getString(
+										R.string.update_now));
+						MainActivity.mMainActivity.mUpdate
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mUpdatelater
+								.setVisibility(View.VISIBLE);
+						MainActivity.mMainActivity.mdoanLoadPro
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mdowanloadSize
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mProgressBar
+								.setVisibility(View.GONE);
+						MainActivity.mMainActivity.mUpdate.setEnabled(true);
+						MainActivity.mMainActivity.mUpdatelater
+								.setEnabled(true);
+					} else {
+						startActivity(new Intent(getApplicationContext(),
+								MainActivity.class)
+								.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+					}
+					setScheduledCheck(false);
+					break;
+				default:
+					break;
+				}
+
+				break;
+
+			default:
+				break;
+			}
+
+		};
+	};
+
+	private HuanLoginListen mHuanLoginListen = new HuanLoginListen() {
+
+		@Override
+		public void StateChange(int arg0, int arg1, String arg2,
+				UpgradeIncrResponse upgradeIncrResponse, String cur,
+				String total) {
+			final String msg;
+			Message message;
+			if (upgradeIncrResponse != null) {
+				msg = "Login info: 类型:" + arg0 + "  状态：" + arg1 + "信息：" + arg2
+						+ " 升级信息 " + upgradeIncrResponse.toString();
+			} else {
+				msg = "Login info: 类型:" + arg0 + "  状态：" + arg1 + "信息：" + arg2;
+			}
+
+			if (MainActivity.mMainActivity != null
+					&& MainActivity.mMainActivity.mTextView != null) {
+				mHandler.post(new Runnable() {
+
+					@Override
+					public void run() {
+						// TODO Auto-generated method stub
+						MainActivity.mMainActivity.mTextView.setText("" + msg);
+					}
+				});
+
+			}
+			// TODO Auto-generated method stub
+			switch (arg0) {
+			case HuanApi.STATE_DEVICEACTIVE:
+				if (arg1 == HuanApi.STATE_DEVICEACTIVE_ACTIVE_SUCC
+						|| arg1 == HuanApi.STATE_DEVICEACTIVE_ISALREADYACTIVE) {
+					mHuanApi.DeviceLogin();
+				}else {
+					int i = mDataSave.getUpdateState();
+					switch (i) {
+					case UPDATE_UPDATE_START:
+					case UPDATE_UPDATE_LATER:
+					case UPDATE_DOWNLOAD_SUCC:
+					case UPDATE_DOWNLOADING:
+						break;
+					default:
+						message = mHandler.obtainMessage();
+						message.what = HANDLER_CHECK;
+						message.arg1 = HANDLER_CHECK_START;
+						mHandler.sendMessage(message);
+						break;
+					}
+				}
+				break;
+			case HuanApi.STATE_DEVICELOGIN:
+				if (arg1 == HuanApi.STATE_DEVICELOGIN_LOGIN_SUCC) {
+					mHuanApi.AutoLoginUser();
+				}else {
+					int i = mDataSave.getUpdateState();
+					switch (i) {
+					case UPDATE_UPDATE_START:
+					case UPDATE_UPDATE_LATER:
+					case UPDATE_DOWNLOAD_SUCC:
+					case UPDATE_DOWNLOADING:
+						break;
+					default:
+						message = mHandler.obtainMessage();
+						message.what = HANDLER_CHECK;
+						message.arg1 = HANDLER_CHECK_START;
+						mHandler.sendMessage(message);
+						break;
+					}
+				}
+				break;
+			case HuanApi.STATE_USERLOGIN:
+//				if (arg1 == HuanApi.STATE_USERLOGIN_LOGIN_SUCC) {
+
+					int i = mDataSave.getUpdateState();
+					switch (i) {
+					case UPDATE_UPDATE_START:
+					case UPDATE_UPDATE_LATER:
+					case UPDATE_DOWNLOAD_SUCC:
+					case UPDATE_DOWNLOADING:
+						break;
+					default:
+						message = mHandler.obtainMessage();
+						message.what = HANDLER_CHECK;
+						message.arg1 = HANDLER_CHECK_START;
+						mHandler.sendMessage(message);
+						break;
+					}
+
+//				}
+
+				break;
+			case HuanApi.STATE_GETUPDATEINFO:
+
+				switch (arg1) {
+				case HuanApi.STATE_GETUPDATEINFO_ISGET:
+
+					break;
+				case HuanApi.STATE_GETUPDATEINFO_ISOK:
+					mUpgradeIncrResponse = upgradeIncrResponse;
+					message = mHandler.obtainMessage();
+					message.what = HANDLER_CHECK;
+					message.arg1 = HANDLER_CHECK_SUCC;
+					mHandler.sendMessage(message);
+					break;
+				case HuanApi.STATE_GETUPDATEINFO_NETCODE_EXCEPTION:
+					message = mHandler.obtainMessage();
+					message.what = HANDLER_CHECK;
+					message.arg1 = HANDLER_CHECK_FAIL_NETEXCEPTION;
+					mHandler.sendMessage(message);
+					break;
+				case HuanApi.STATE_GETUPDATEINFO_NETCODE_ISNO200:
+					message = mHandler.obtainMessage();
+					message.what = HANDLER_CHECK;
+					message.arg1 = HANDLER_CHECK_FAIL_NETISNO200;
+					mHandler.sendMessage(message);
+					break;
+
+				default:
+					break;
+				}
+				break;
+			case HuanApi.STATE_DOWNLOAD:
+
+				switch (arg1) {
+				case HuanApi.STATE_DOWNLOAD_ISOK:
+					mUpgradeIncrResponseUpgrade.setDownloadid(arg2);
+					message = mHandler.obtainMessage();
+					message.what = HANDLER_DOWMLOAD;
+					message.arg1 = HANDLER_DOWMLOAD_SUCC;
+					mHandler.sendMessage(message);
+					break;
+				case HuanApi.STATE_DOWNLOAD_NETCODE_EXCEPTION:
+					message = mHandler.obtainMessage();
+					message.what = HANDLER_DOWMLOAD;
+					message.arg1 = HANDLER_DOWMLOAD_FAIL_NETEXCEPTION;
+					mHandler.sendMessage(message);
+					break;
+				case HuanApi.STATE_DOWNLOAD_NETCODE_ISNO200:
+					message = mHandler.obtainMessage();
+					message.what = HANDLER_DOWMLOAD;
+					message.arg1 = HANDLER_DOWMLOAD_FAIL_NETISNO200;
+					mHandler.sendMessage(message);
+					break;
+
+				default:
+					break;
+				}
+
+				break;
+
+			default:
+				break;
+			}
+		}
+	};
+
+	private class InstallAndRebootThread extends Thread {
+		private final Context mContext;
+		private final File mFile;
+
+		InstallAndRebootThread(Context context, File file) {
+			mContext = context;
+			mFile = file;
+		}
+
+		public void run() {
+			try {
+				Message message = mHandler.obtainMessage();
+				message = mHandler.obtainMessage();
+				message.what = HANDLER_UPDATE;
+				message.arg1 = HANDLER_UPDATE_SUCC;
+				mHandler.sendMessage(message);
+				RecoverySystem.installPackage(mContext, mFile);
+
+			} catch (IOException e) {
+				e.printStackTrace();
+				Message message = mHandler.obtainMessage();
+				message = mHandler.obtainMessage();
+				message.what = HANDLER_UPDATE;
+				message.arg1 = HANDLER_UPDATE_FAIL;
+				mHandler.sendMessage(message);
+			}
+		}
+	}
+
+	private static final long CHECK_INTERVAL = AlarmManager.INTERVAL_HALF_DAY;
+
+	public void setScheduledCheck(boolean on) {
+		if (on) {
+			Intent intent = new Intent("com.siviton.updatelater");
+
+			PendingIntent i = PendingIntent.getBroadcast(this, 0, intent, 0);
+			long delay = 1000 * 30; // 30 seconds
+			mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME,
+					SystemClock.elapsedRealtime() + 1000 * 60 * 60 * 6,
+//					SystemClock.elapsedRealtime() + 1000 * 60 ,
+					CHECK_INTERVAL, i);
+			mScheduledCheckIntent = i;
+		} else {
+			mAlarmManager.cancel(mScheduledCheckIntent);
+		}
+	}
+}

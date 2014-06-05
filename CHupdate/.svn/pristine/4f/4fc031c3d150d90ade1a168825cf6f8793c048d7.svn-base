@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AbsoluteLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="1000dip"
+    android:layout_height="600dp"
+    android:orientation="vertical" >
+
+    <LinearLayout
+        android:layout_width="980dp"
+        android:layout_height="60dp"
+        android:layout_x="10dp"
+        android:layout_y="450dp"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp" >
+
+        <Button
+            android:id="@+id/download_update"
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1"
+            android:layout_x="27dp"
+            android:layout_y="107dp"
+            android:enabled="false"
+            android:gravity="center"
+            android:text="@string/download_update"
+            android:textSize="30sp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/download_update_later"
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1"
+            android:layout_x="915dp"
+            android:layout_y="106dp"
+            android:enabled="false"
+            android:gravity="center"
+            android:text="@string/download_update_later"
+            android:textSize="30sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="980dp"
+        android:layout_height="120dp"
+        android:layout_x="10dp"
+        android:layout_y="49dp"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp" >
+
+        <TextView
+            android:id="@+id/tv_downloadmsg"
+            android:layout_width="0dp"
+            android:layout_height="fill_parent"
+            android:layout_weight="1"
+            android:layout_x="27dp"
+            android:layout_y="107dp"
+            android:gravity="center"
+            android:textSize="20sp"
+            android:visibility="visible" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="980dp"
+        android:layout_height="120dp"
+        android:layout_x="5dp"
+        android:layout_y="252dp"
+        android:orientation="vertical"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp" >
+
+        <ProgressBar
+            android:id="@+id/progressBar_download"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_x="40dp"
+            android:layout_y="178dp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="50dp"
+            android:paddingTop="2dp" >
+
+            <TextView
+                android:id="@+id/tv_downloadsize"
+                android:layout_width="0dp"
+                android:layout_height="fill_parent"
+                android:layout_weight="1"
+                android:layout_x="27dp"
+                android:layout_y="107dp"
+                android:gravity="center_vertical"
+                android:textSize="20sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tv_downloadpross"
+                android:layout_width="0dp"
+                android:layout_height="fill_parent"
+                android:layout_weight="1"
+                android:layout_x="915dp"
+                android:layout_y="106dp"
+                android:gravity="center_vertical|right"
+                android:textSize="20sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+</AbsoluteLayout>

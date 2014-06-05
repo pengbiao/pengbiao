@@ -1,0 +1,403 @@
+package com.siviton.huan.server;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.database.Cursor;
+import android.os.Bundle;
+import android.os.Handler;
+import android.provider.Downloads;
+import android.support.v4.view.ViewPager;
+import android.support.v4.view.ViewPager.OnPageChangeListener;
+import android.view.KeyEvent;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+
+import com.siviton.huanapi.R;
+import com.siviton.huanapi.data.DataSave;
+
+public class MainActivity extends Activity implements OnClickListener {
+
+	public TextView mTextView;
+	public static MainActivity mMainActivity;
+	private MainPagerAdapter mPagerAdapter;
+	private List<View> mViews;
+	private LayoutInflater mLayoutInflater;
+	private View mIntertUpdateView;
+	private View mDownloadView;
+	public ViewPager mViewPager;
+	private Button mtitleupdate;
+	private Button mtitledownload;
+	public Button mcheckupdate;
+	public Button mdownload;
+	public TextView mCheckMsg;
+	public Button mUpdate;
+	public Button mUpdatelater;
+	public TextView mDownloadMsg;
+	public TextView mdowanloadSize;
+	public TextView mdoanLoadPro;
+	public ProgressBar mProgressBar;
+	private DataSave mDataSave;
+	private boolean isMainActivity;
+    private TextView mCurVer;
+	@Override
+	protected void onCreate(Bundle arg0) {
+		// TODO Auto-generated method stub
+		super.onCreate(arg0);
+		setContentView(R.layout.activity_main);
+		mMainActivity = this;
+		mTextView = (TextView) findViewById(R.id.main_msg);
+		// startService(new Intent(this, HuanServer.class).putExtra("style",
+		// HuanServer.MAIN_TEST));
+		mLayoutInflater = this.getLayoutInflater();
+		mIntertUpdateView = mLayoutInflater.inflate(R.layout.internet_update,
+				null);
+		mDownloadView = mLayoutInflater
+				.inflate(R.layout.download_process, null);
+		mViews = new ArrayList<View>();
+		mViews.add(mIntertUpdateView);
+		mViews.add(mDownloadView);
+		mPagerAdapter = new MainPagerAdapter(mViews);
+		mViewPager = (ViewPager) findViewById(R.id.main_page);
+		mViewPager.setAdapter(mPagerAdapter);
+
+		mViewPager.setOnPageChangeListener(mPageChangeListener);
+		mViewPager.setFocusable(false);
+		mtitledownload = (Button) findViewById(R.id.main_btn_download);
+		mtitleupdate = (Button) findViewById(R.id.main_btn_internetupdate);
+		
+		mcheckupdate = (Button) mIntertUpdateView.findViewById(R.id.main_check);
+		mdownload = (Button) mIntertUpdateView.findViewById(R.id.main_download);
+		mCheckMsg = (TextView) mIntertUpdateView.findViewById(R.id.tv_checkmsg);
+		mProgressBar = (ProgressBar) mDownloadView
+				.findViewById(R.id.progressBar_download);
+		mdowanloadSize = (TextView) mDownloadView
+				.findViewById(R.id.tv_downloadsize);
+		mdoanLoadPro = (TextView) mDownloadView
+				.findViewById(R.id.tv_downloadpross);
+		mDownloadMsg = (TextView) mDownloadView
+				.findViewById(R.id.tv_downloadmsg);
+		mUpdate = (Button) mDownloadView.findViewById(R.id.download_update);
+		mUpdatelater = (Button) mDownloadView
+				.findViewById(R.id.download_update_later);
+		mtitledownload.setOnClickListener(this);
+		mcheckupdate.setOnClickListener(this);
+		mdownload.setOnClickListener(this);
+		mtitleupdate.setOnClickListener(this);
+		mUpdate.setOnClickListener(this);
+		mUpdatelater.setOnClickListener(this);
+		mdownload.setEnabled(false);
+		mDataSave = new DataSave(getApplicationContext());
+		int i = mDataSave.getUpdateState();
+		switch (i) {
+		case HuanServer.UPDATE_UPDATE_LATER:
+		case HuanServer.UPDATE_UPDATE_START:
+		case HuanServer.UPDATE_DOWNLOAD_SUCC:
+			mcheckupdate.setEnabled(false);
+			mdownload.setEnabled(false);
+			mUpdate.setVisibility(View.VISIBLE);
+			mUpdatelater.setVisibility(View.VISIBLE);
+			mUpdate.setEnabled(true);
+			mUpdatelater.setEnabled(true);
+			mdoanLoadPro.setVisibility(View.INVISIBLE);
+			mdowanloadSize.setVisibility(View.INVISIBLE);
+			mProgressBar.setVisibility(View.INVISIBLE);
+			mViewPager.setCurrentItem(1);
+			mDownloadMsg.setText(getResources().getString(R.string.update_now));
+			mCheckMsg.setText("");
+			mtitledownload.setBackgroundResource(R.drawable.bg);
+			mtitleupdate.setBackgroundResource(R.drawable.bg2);
+			break;
+		case HuanServer.UPDATE_DOWNLOADING:
+			mcheckupdate.setEnabled(false);
+			mdownload.setEnabled(false);
+			mUpdate.setVisibility(View.INVISIBLE);
+			mUpdatelater.setVisibility(View.INVISIBLE);
+			// mdoanLoadPro.setVisibility(View.VISIBLE);
+			// mdowanloadSize.setVisibility(View.VISIBLE);
+			// mProgressBar.setVisibility(View.VISIBLE);
+			mViewPager.setCurrentItem(1);
+			mDownloadMsg
+					.setText(getResources().getString(R.string.downloading));
+			mCheckMsg.setText("");
+			mtitledownload.setBackgroundResource(R.drawable.bg);
+			mtitleupdate.setBackgroundResource(R.drawable.bg2);
+			break;
+		default:
+			mcheckupdate.setEnabled(true);
+			mdownload.setEnabled(false);
+			mUpdate.setVisibility(View.INVISIBLE);
+			mUpdatelater.setVisibility(View.INVISIBLE);
+			mdoanLoadPro.setVisibility(View.INVISIBLE);
+			mdowanloadSize.setVisibility(View.INVISIBLE);
+			mProgressBar.setVisibility(View.INVISIBLE);
+			mViewPager.setCurrentItem(0);
+			mCheckMsg.setText("");
+			mDownloadMsg.setText("");
+			mtitledownload.setBackgroundResource(R.drawable.bg2);
+			mtitleupdate.setBackgroundResource(R.drawable.bg);
+			break;
+		}
+		isMainActivity = true;
+		proThread.start();
+		mCurVer=(TextView) mIntertUpdateView.findViewById(R.id.main_curver);
+		mCurVer.setText(getver());
+	}
+
+	@Override
+	protected void onResume() {
+		// TODO Auto-generated method stub
+		super.onResume();
+		if (getIntent() != null && getIntent().getExtras() != null) {
+			int i = getIntent().getIntExtra("haveupdate", -1);
+			if (i == 1) {
+				mcheckupdate.setEnabled(false);
+				mdownload.setEnabled(true);
+				mUpdate.setVisibility(View.INVISIBLE);
+				mUpdatelater.setVisibility(View.INVISIBLE);
+				mUpdate.setEnabled(false);
+				mUpdatelater.setEnabled(false);
+				mdoanLoadPro.setVisibility(View.INVISIBLE);
+				mdowanloadSize.setVisibility(View.INVISIBLE);
+				mProgressBar.setVisibility(View.INVISIBLE);
+				mViewPager.setCurrentItem(0);
+				mCheckMsg.setText(getResources().getString(
+						R.string.main_have_new));
+				mDownloadMsg.setText("");
+				mtitledownload.setBackgroundResource(R.drawable.bg2);
+				mtitleupdate.setBackgroundResource(R.drawable.bg);
+			}
+		}
+	}
+
+	@Override
+	public void onClick(View arg0) {
+		// TODO Auto-generated method stub
+		switch (arg0.getId()) {
+		case R.id.main_check:
+			startService(new Intent(this, HuanServer.class).putExtra("style",
+					HuanServer.CHECK_UPDATE));
+			break;
+		case R.id.main_download:
+			startService(new Intent(this, HuanServer.class).putExtra("style",
+					HuanServer.DOWNLOAD));
+			break;
+		case R.id.main_btn_download:
+			mtitledownload.setBackgroundResource(R.drawable.bg);
+			mtitleupdate.setBackgroundResource(R.drawable.bg2);
+			mViewPager.setCurrentItem(1);
+
+			break;
+		case R.id.main_btn_internetupdate:
+			mtitledownload.setBackgroundResource(R.drawable.bg2);
+			mtitleupdate.setBackgroundResource(R.drawable.bg);
+			mViewPager.setCurrentItem(0);
+
+			break;
+
+		case R.id.download_update:
+			startService(new Intent(this, HuanServer.class).putExtra("style",
+					HuanServer.UPDATE_NOW));
+			break;
+		case R.id.download_update_later:
+			startService(new Intent(this, HuanServer.class).putExtra("style",
+					HuanServer.UPDATE_LATER));
+			break;
+		default:
+			break;
+		}
+	}
+
+	@Override
+	public boolean dispatchKeyEvent(KeyEvent event) {
+		// TODO Auto-generated method stub
+		if (event.getAction() == KeyEvent.ACTION_DOWN) {
+			int arg0 = event.getKeyCode();
+			switch (arg0) {
+			case KeyEvent.KEYCODE_DPAD_LEFT:
+				if (mtitleupdate.isFocused()) {
+					mViewPager.setCurrentItem(1);
+					mtitledownload.requestFocus();
+					return true;
+				} else if (mtitledownload.isFocused()) {
+					mViewPager.setCurrentItem(0);
+					mtitleupdate.requestFocus();
+					return true;
+				} else if (mcheckupdate.isFocused()) {
+					return true;
+				}
+
+				break;
+			case KeyEvent.KEYCODE_DPAD_RIGHT:
+				if (mtitleupdate.isFocused()) {
+					mViewPager.setCurrentItem(1);
+					mtitledownload.requestFocus();
+					return true;
+				} else if (mtitledownload.isFocused()) {
+					mViewPager.setCurrentItem(0);
+					mtitleupdate.requestFocus();
+					return true;
+				} else if (mdownload.isFocused()) {
+					return true;
+				}
+				break;
+
+			default:
+				break;
+			}
+		}
+		return super.dispatchKeyEvent(event);
+	}
+
+	@Override
+	public boolean onKeyDown(int arg0, KeyEvent arg1) {
+		// TODO Auto-generated method stub
+
+		return super.onKeyDown(arg0, arg1);
+	}
+
+	private OnPageChangeListener mPageChangeListener = new OnPageChangeListener() {
+
+		@Override
+		public void onPageSelected(int arg0) {
+			// TODO Auto-generated method stub
+
+			switch (arg0) {
+			case 0:
+				mtitledownload.setBackgroundResource(R.drawable.bg2);
+				mtitleupdate.setBackgroundResource(R.drawable.bg);
+				break;
+			case 1:
+				mtitledownload.setBackgroundResource(R.drawable.bg);
+				mtitleupdate.setBackgroundResource(R.drawable.bg2);
+				break;
+			default:
+				break;
+			}
+		}
+
+		@Override
+		public void onPageScrolled(int arg0, float arg1, int arg2) {
+			// TODO Auto-generated method stub
+
+		}
+
+		@Override
+		public void onPageScrollStateChanged(int arg0) {
+			// TODO Auto-generated method stub
+
+		}
+	};
+
+	@Override
+	protected void onDestroy() {
+		// TODO Auto-generated method stub
+		mMainActivity = null;
+		isMainActivity = false;
+		super.onDestroy();
+	}
+
+	@Override
+	protected void onPause() {
+		// TODO Auto-generated method stub
+		finish();
+		super.onPause();
+	}
+
+	Cursor cursor;
+	private Thread proThread = new Thread() {
+
+		public void run() {
+
+			while (isMainActivity) {
+				try {
+					int i = mDataSave.getUpdateState();
+					String id = mDataSave.getDownloadID();
+					if (i == HuanServer.UPDATE_DOWNLOADING && id != null) {
+						cursor = getContentResolver().query(
+								Downloads.Impl.CONTENT_URI, null, "_id=?",
+								new String[] { "" + id }, null);
+						if (cursor != null) {
+							if (cursor.moveToFirst()) {
+								String string = cursor
+										.getString(cursor
+												.getColumnIndex(Downloads.Impl.COLUMN_CURRENT_BYTES));
+								String string1 = cursor
+										.getString(cursor
+												.getColumnIndex(Downloads.Impl.COLUMN_TOTAL_BYTES));
+
+								if (string != null && string1 != null) {
+									final int cur = Integer.valueOf(string) / 1024 / 1024;
+									final int total = Integer.valueOf(string1) / 1024 / 1024;
+									final int pro = (cur * 100) / total;
+									mHandler.post(new Runnable() {
+
+										@Override
+										public void run() {
+											// TODO Auto-generated method stub
+											mdoanLoadPro.setText(cur + "M" + "/"
+													+ total + "M" + "   " + pro
+													+ "%");
+
+											mProgressBar.setMax(total);
+											mProgressBar.setProgress(cur);
+										}
+									});
+
+								}
+							}
+							cursor.close();
+						}
+						mHandler.post(new Runnable() {
+
+							@Override
+							public void run() {
+								// TODO Auto-generated method stub
+								mdoanLoadPro.setVisibility(View.VISIBLE);
+								mdowanloadSize.setVisibility(View.VISIBLE);
+								mProgressBar.setVisibility(View.VISIBLE);
+							}
+						});
+
+					} else {
+						mHandler.post(new Runnable() {
+
+							@Override
+							public void run() {
+								// TODO Auto-generated method stub
+								mdoanLoadPro.setVisibility(View.INVISIBLE);
+								mdowanloadSize.setVisibility(View.INVISIBLE);
+								mProgressBar.setVisibility(View.INVISIBLE);
+							}
+						});
+
+					}
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				} catch (Exception e) {
+					// TODO: handle exception
+				}
+			
+			}
+
+		};
+	};
+	private Handler mHandler = new Handler() {
+	};
+
+	private String getver() {
+
+		return "SVT_CH_ANDROID_V1.0";
+	}
+
+}
