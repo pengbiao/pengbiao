@@ -3,7 +3,7 @@
     package="com.siviton.huanapi"
     android:process="system"
     android:sharedUserId="android.uid.system"
-    android:versionCode="1"
+    android:versionCode="2"
     android:versionName="1.0" >
 
     <uses-permission android:name="android.permission.REBOOT" />
