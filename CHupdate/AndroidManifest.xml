@@ -4,7 +4,7 @@
     android:process="system"
     android:sharedUserId="android.uid.system"
     android:versionCode="2"
-    android:versionName="1.0" >
+    android:versionName="2.0" >
 
     <uses-permission android:name="android.permission.REBOOT" />
 
